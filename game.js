@@ -14,6 +14,7 @@ const COLORS = [
   '#7986cb', // J - indigo
   '#ffb74d', // L - orange
   '#ff5722', // Bomba
+  '#78909c', // Bloque fijo (desafío)
 ];
 
 const PIECES = [
@@ -30,6 +31,17 @@ const PIECES = [
 
 const BOMB = 8;
 const BOMB_EVERY = 7; // líneas por bomba
+const FIXED = 9;
+
+// Desafío: filas inferiores del tablero inicial ('#' = bloque pre-colocado)
+const CHALLENGE_LAYOUT = [
+  '#.#.#.#.#.',
+  '.#.#.#.#.#',
+  '##.##.##.#',
+  '#.####.###',
+  '###.##.#.#',
+  '#.##.####.',
+];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
@@ -43,12 +55,27 @@ const levelEl = document.getElementById('level');
 const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
-const restartBtn = document.getElementById('restart-btn');
+const normalBtn = document.getElementById('mode-normal');
+const challengeBtn = document.getElementById('mode-challenge');
+const fixedSection = document.getElementById('fixed-section');
+const fixedEl = document.getElementById('fixed-left');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, mode = 'normal';
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+}
+
+function loadChallenge() {
+  const top = ROWS - CHALLENGE_LAYOUT.length;
+  CHALLENGE_LAYOUT.forEach((row, i) => {
+    for (let c = 0; c < COLS; c++)
+      if (row[c] === '#') board[top + i][c] = FIXED;
+  });
+}
+
+function countFixed() {
+  return board.reduce((n, row) => n + row.filter(v => v === FIXED).length, 0);
 }
 
 function randomPiece() {
@@ -165,6 +192,10 @@ function lockPiece() {
   if (current.type === BOMB) explode(current.x, current.y);
   else merge();
   clearLines();
+  if (mode === 'challenge' && countFixed() === 0) {
+    winGame();
+    return;
+  }
   spawn();
 }
 
@@ -181,6 +212,8 @@ function updateHUD() {
   scoreEl.textContent = score.toLocaleString();
   linesEl.textContent = lines;
   levelEl.textContent = level;
+  fixedSection.classList.toggle('hidden', mode !== 'challenge');
+  if (board) fixedEl.textContent = countFixed();
 }
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
@@ -257,16 +290,34 @@ function drawNext() {
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
 }
 
+function winGame() {
+  gameOver = true;
+  cancelAnimationFrame(animId);
+  overlayTitle.textContent = '¡DESAFÍO SUPERADO!';
+  overlayTitle.classList.add('win');
+  overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  overlay.classList.remove('hidden');
+}
+
+function showMenu() {
+  gameOver = true;
+  overlayTitle.textContent = 'TETRIS';
+  overlayTitle.classList.remove('win');
+  overlayScore.textContent = 'Elige modo';
+  overlay.classList.remove('hidden');
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
+  overlayTitle.classList.remove('win');
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   overlay.classList.remove('hidden');
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (gameOver || !current) return;
   paused = !paused;
   if (!paused) {
     lastTime = performance.now();
@@ -295,8 +346,11 @@ function loop(ts) {
   animId = requestAnimationFrame(loop);
 }
 
-function init() {
+function init(newMode) {
+  mode = newMode ?? mode;
   board = createBoard();
+  if (mode === 'challenge') loadChallenge();
+  overlayTitle.classList.remove('win');
   score = 0;
   lines = 0;
   bombsGiven = 0;
@@ -340,6 +394,7 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
+normalBtn.addEventListener('click', () => init('normal'));
+challengeBtn.addEventListener('click', () => init('challenge'));
 
-init();
+showMenu();
