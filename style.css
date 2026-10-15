@@ -173,3 +173,13 @@ kbd {
 .hidden {
   display: none;
 }
+
+/* ---- Selector de tema ---- */
+#skin-select {
+  background: #22223a;
+  color: #e0e0e0;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 13px;
+}
