@@ -166,6 +166,82 @@ kbd {
   background: #9bbdff;
 }
 
+.name-form {
+  display: flex;
+  gap: 6px;
+}
+
+.name-form input {
+  width: 120px;
+  background: #22223a;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.name-form button {
+  background: #81c784;
+  color: #0f0f17;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.records {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.records ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.records li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.records li.current {
+  background: #7aa2f7;
+  color: #0f0f17;
+  font-weight: 700;
+}
+
+.records p {
+  margin: 0;
+}
+
+#reset-records {
+  background: none;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  color: #888;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+#reset-records:hover {
+  color: #e57373;
+  border-color: #e57373;
+}
+
 #overlay-title.win {
   color: #81c784;
 }

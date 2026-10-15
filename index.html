@@ -53,6 +53,16 @@
       <div class="overlay-box">
         <p id="overlay-title">GAME OVER</p>
         <p id="overlay-score"></p>
+        <form id="name-form" class="name-form hidden">
+          <input id="name-input" type="text" maxlength="12" placeholder="Tu nombre" autocomplete="off" />
+          <button type="submit">Guardar</button>
+        </form>
+        <div id="records" class="records hidden">
+          <span class="label">RECORDS</span>
+          <ol id="records-list"></ol>
+          <p id="records-best"></p>
+          <button id="reset-records" type="button">Borrar records</button>
+        </div>
         <div class="mode-buttons">
           <button id="mode-normal">Normal</button>
           <button id="mode-challenge">Desafío</button>
