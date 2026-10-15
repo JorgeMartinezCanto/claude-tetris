@@ -45,6 +45,9 @@ const CHALLENGE_LAYOUT = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+const RECORDS_KEY = 'tetris-records';
+const MAX_RECORDS = 5;
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -65,7 +68,15 @@ const pauseMenu = document.getElementById('pause-menu');
 const pauseControlsList = document.getElementById('pause-controls-list');
 const startLevelEl = document.getElementById('start-level');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, mode = 'normal', startLevel = 1, baseLevel = 1;
+const nameForm = document.getElementById('name-form');
+const nameInput = document.getElementById('name-input');
+const recordsBox = document.getElementById('records');
+const recordsList = document.getElementById('records-list');
+const recordsBest = document.getElementById('records-best');
+const resetRecordsBtn = document.getElementById('reset-records');
+
+
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, combo, maxCombo, pendingEntry, mode = 'normal', startLevel = 1, baseLevel = 1;
 
 function intervalFor(lvl) {
   return Math.max(100, 1000 - (lvl - 1) * 90);
@@ -138,6 +149,97 @@ function merge() {
         board[current.y + r][current.x + c] = current.shape[r][c];
 }
 
+function loadRecords() {
+  const empty = { entries: [], bestCombo: 0, maxLines: 0 };
+  try {
+    const data = JSON.parse(localStorage.getItem(RECORDS_KEY));
+    if (!data || !Array.isArray(data.entries)) return empty;
+    return {
+      entries: data.entries
+        .filter(e => e && typeof e.score === 'number' && isFinite(e.score))
+        .map(e => ({ ...e, name: String(e.name ?? '---').slice(0, 12), lines: e.lines ?? 0, combo: e.combo ?? 0 }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, MAX_RECORDS),
+      bestCombo: Number(data.bestCombo) || 0,
+      maxLines: Number(data.maxLines) || 0,
+    };
+  } catch (err) {
+    return empty;
+  }
+}
+
+function saveRecords(data) {
+  try {
+    localStorage.setItem(RECORDS_KEY, JSON.stringify(data));
+  } catch (err) { /* almacenamiento no disponible */ }
+}
+
+function qualifies(records) {
+  return score > 0 && (records.entries.length < MAX_RECORDS ||
+    score > records.entries[records.entries.length - 1].score);
+}
+
+// Muestra la tabla; highlight = índice de la fila a resaltar (o -1)
+function renderRecords(highlight = -1) {
+  const records = loadRecords();
+  recordsList.innerHTML = '';
+  for (let i = 0; i < MAX_RECORDS; i++) {
+    const e = records.entries[i];
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    const pts = document.createElement('span');
+    name.textContent = `${i + 1}. ${e ? e.name : '---'}`;
+    pts.textContent = e ? e.score.toLocaleString() : '';
+    li.append(name, pts);
+    if (e) li.title = `${e.lines} líneas · combo ${e.combo} · ${e.mode === 'challenge' ? 'Desafío' : 'Normal'} · ${e.date}`;
+    if (i === highlight) li.classList.add('current');
+    recordsList.appendChild(li);
+  }
+  recordsBest.textContent = `Mejor combo: ${records.bestCombo} · Máx. líneas: ${records.maxLines}`;
+  recordsBox.classList.remove('hidden');
+}
+
+function hideRecordsUI() {
+  recordsBox.classList.add('hidden');
+  nameForm.classList.add('hidden');
+}
+
+// Fin de partida: guarda récords de combo/líneas y ofrece el nombre si entra en el top
+function showResultRecords() {
+  const records = loadRecords();
+  records.bestCombo = Math.max(records.bestCombo, maxCombo);
+  records.maxLines = Math.max(records.maxLines, lines);
+  saveRecords(records);
+  pendingEntry = qualifies(records);
+  renderRecords();
+  nameForm.classList.toggle('hidden', !pendingEntry);
+  if (pendingEntry) {
+    nameInput.value = '';
+    nameInput.focus();
+  }
+}
+
+function submitRecord() {
+  if (!pendingEntry) return;
+  pendingEntry = false;
+  const records = loadRecords();
+  if (!qualifies(records)) { nameForm.classList.add('hidden'); renderRecords(); return; }
+  const entry = {
+    name: nameInput.value.trim().slice(0, 12) || 'Anónimo',
+    score, lines, combo: maxCombo, mode,
+    date: new Date().toLocaleDateString('sv'),
+  };
+  // tras los empates: la entrada nueva queda debajo de las iguales
+  let idx = records.entries.findIndex(e => e.score < score);
+  if (idx === -1) idx = records.entries.length;
+  records.entries.splice(idx, 0, entry);
+  records.entries.length = Math.min(records.entries.length, MAX_RECORDS);
+  saveRecords(records);
+  nameForm.classList.add('hidden');
+  renderRecords(idx);
+  nameInput.blur();
+}
+
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
@@ -160,6 +262,7 @@ function clearLines() {
     dropInterval = intervalFor(level);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -200,7 +303,13 @@ function explode(cx, cy) {
 function lockPiece() {
   if (current.type === BOMB) explode(current.x, current.y);
   else merge();
-  clearLines();
+  // combo: locks consecutivos que limpian línea
+  if (clearLines()) {
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
+  } else {
+    combo = 0;
+  }
   if (mode === 'challenge' && countFixed() === 0) {
     winGame();
     return;
@@ -409,6 +518,7 @@ function winGame() {
   overlayTitle.textContent = '¡DESAFÍO SUPERADO!';
   overlayTitle.classList.add('win');
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  showResultRecords();
   overlay.classList.remove('hidden');
 }
 
@@ -417,6 +527,9 @@ function showMenu() {
   overlayTitle.textContent = 'TETRIS';
   overlayTitle.classList.remove('win');
   overlayScore.textContent = 'Elige modo';
+  pendingEntry = false;
+  nameForm.classList.add('hidden');
+  renderRecords();
   overlay.classList.remove('hidden');
 }
 
@@ -426,6 +539,7 @@ function endGame() {
   overlayTitle.classList.remove('win');
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  showResultRecords();
   overlay.classList.remove('hidden');
 }
 
@@ -442,6 +556,7 @@ function togglePause() {
     modeButtons.classList.add('hidden');
     pauseMenu.classList.remove('hidden');
     pauseControlsList.classList.add('hidden');
+    hideRecordsUI();
     overlay.classList.remove('hidden');
   }
   if (!paused) {
@@ -468,6 +583,7 @@ function loop(ts) {
 }
 
 function init(newMode) {
+  submitRecord(); // si el jugador no pulsó Guardar, se guarda como Anónimo
   mode = newMode ?? mode;
   board = createBoard();
   if (mode === 'challenge') loadChallenge();
@@ -478,6 +594,9 @@ function init(newMode) {
   bombPending = false;
   baseLevel = startLevel;
   level = baseLevel;
+  combo = 0;
+  maxCombo = 0;
+  pendingEntry = false;
   paused = false;
   gameOver = false;
   dropInterval = intervalFor(level);
@@ -489,11 +608,13 @@ function init(newMode) {
   overlay.classList.add('hidden');
   pauseMenu.classList.add('hidden');
   modeButtons.classList.remove('hidden');
+  hideRecordsUI();
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
+  if (e.target instanceof HTMLInputElement) return; // escribir el nombre no mueve piezas
   if (document.activeElement === skinSelect) skinSelect.blur();
   if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (paused || gameOver) return;
@@ -526,6 +647,17 @@ startLevelEl.addEventListener('change', () => { startLevel = Number(startLevelEl
 skinSelect.addEventListener('change', () => {
   setSkin(skinSelect.value);
   skinSelect.blur();
+});
+
+nameForm.addEventListener('submit', e => {
+  e.preventDefault();
+  submitRecord();
+});
+resetRecordsBtn.addEventListener('click', () => {
+  if (!confirm('¿Borrar todos los records?')) return;
+  try { localStorage.removeItem(RECORDS_KEY); } catch (err) { /* sin almacenamiento */ }
+  renderRecords();
+  resetRecordsBtn.blur();
 });
 
 normalBtn.addEventListener('click', () => init('normal'));
