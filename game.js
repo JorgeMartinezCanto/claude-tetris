@@ -59,8 +59,12 @@ const normalBtn = document.getElementById('mode-normal');
 const challengeBtn = document.getElementById('mode-challenge');
 const fixedSection = document.getElementById('fixed-section');
 const fixedEl = document.getElementById('fixed-left');
+const modeButtons = document.getElementById('mode-buttons');
+const pauseMenu = document.getElementById('pause-menu');
+const pauseControlsList = document.getElementById('pause-controls-list');
+const startLevelEl = document.getElementById('start-level');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, mode = 'normal';
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, mode = 'normal', startLevel = 1;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -142,7 +146,7 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
+    level = startLevel + Math.floor(lines / 10);
     const earned = Math.floor(lines / BOMB_EVERY);
     if (earned > bombsGiven) {
       bombsGiven = earned;
@@ -326,7 +330,15 @@ function togglePause() {
     cancelAnimationFrame(animId);
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
+    modeButtons.classList.add('hidden');
+    pauseMenu.classList.remove('hidden');
+    pauseControlsList.classList.add('hidden');
     overlay.classList.remove('hidden');
+  }
+  if (!paused) {
+    overlay.classList.add('hidden');
+    pauseMenu.classList.add('hidden');
+    modeButtons.classList.remove('hidden');
   }
 }
 
@@ -355,22 +367,24 @@ function init(newMode) {
   lines = 0;
   bombsGiven = 0;
   bombPending = false;
-  level = 1;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  pauseMenu.classList.add('hidden');
+  modeButtons.classList.remove('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -393,6 +407,11 @@ document.addEventListener('keydown', e => {
   }
   updateHUD();
 });
+
+document.getElementById('pause-resume').addEventListener('click', togglePause);
+document.getElementById('pause-restart').addEventListener('click', () => init());
+document.getElementById('pause-controls').addEventListener('click', () => pauseControlsList.classList.toggle('hidden'));
+startLevelEl.addEventListener('change', () => { startLevel = Number(startLevelEl.value); });
 
 normalBtn.addEventListener('click', () => init('normal'));
 challengeBtn.addEventListener('click', () => init('challenge'));
