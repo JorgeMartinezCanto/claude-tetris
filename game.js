@@ -64,7 +64,11 @@ const pauseMenu = document.getElementById('pause-menu');
 const pauseControlsList = document.getElementById('pause-controls-list');
 const startLevelEl = document.getElementById('start-level');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, mode = 'normal', startLevel = 1;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, bombsGiven, bombPending, mode = 'normal', startLevel = 1, baseLevel = 1;
+
+function intervalFor(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
+}
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -146,13 +150,13 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = startLevel + Math.floor(lines / 10);
+    level = baseLevel + Math.floor(lines / 10);
     const earned = Math.floor(lines / BOMB_EVERY);
     if (earned > bombsGiven) {
       bombsGiven = earned;
       bombPending = true;
     }
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    dropInterval = intervalFor(level);
     updateHUD();
   }
 }
@@ -367,10 +371,11 @@ function init(newMode) {
   lines = 0;
   bombsGiven = 0;
   bombPending = false;
-  level = startLevel;
+  baseLevel = startLevel;
+  level = baseLevel;
   paused = false;
   gameOver = false;
-  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  dropInterval = intervalFor(level);
   dropAccum = 0;
   lastTime = performance.now();
   next = randomPiece();
@@ -408,10 +413,10 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-document.getElementById('pause-resume').addEventListener('click', togglePause);
+document.getElementById('pause-resume').addEventListener('click', e => { e.currentTarget.blur(); togglePause(); });
 document.getElementById('pause-restart').addEventListener('click', () => init());
 document.getElementById('pause-controls').addEventListener('click', () => pauseControlsList.classList.toggle('hidden'));
-startLevelEl.addEventListener('change', () => { startLevel = Number(startLevelEl.value); });
+startLevelEl.addEventListener('change', () => { startLevel = Number(startLevelEl.value); startLevelEl.blur(); });
 
 normalBtn.addEventListener('click', () => init('normal'));
 challengeBtn.addEventListener('click', () => init('challenge'));
